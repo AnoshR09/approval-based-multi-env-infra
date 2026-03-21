@@ -73,7 +73,7 @@ jobs:
       # Terraform Plan
       - name: Terraform Plan
         working-directory: ./env/${{ env.ENV }}
-        run: terraform plan -var="environment=$ENV" -out=tfplan
+        run: terraform plan  -out=tfplan
 
       # Terraform Apply (only auto for dev & uat)
       - name: Terraform Apply
