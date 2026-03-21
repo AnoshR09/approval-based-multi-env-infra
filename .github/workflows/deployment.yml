@@ -1,15 +1,10 @@
-name: Terraform Multi-Environment Deployment
+name: Terraform Deployment
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-      - uat
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Select environment'
+        description: "Select Environment"
         required: true
         type: choice
         options:
@@ -19,80 +14,41 @@ on:
 
 jobs:
   terraform:
-    name: Terraform Deploy
     runs-on: ubuntu-latest
 
-  deploy:
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Deploy
-        run: echo "Deploying to ${{ github.event.inputs.environment }} environment"
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # steps:
-    #   # Checkout repo
-    #   - name: Checkout code
-    #     uses: actions/checkout@v3
-
-      # Set environment dynamically
+      # Set ENV
       - name: Set Environment
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-          else
-            BRANCH=${GITHUB_REF##*/}
-            if [ "$BRANCH" == "main" ]; then
-              echo "ENV=prod" >> $GITHUB_ENV
-            elif [ "$BRANCH" == "uat" ]; then
-              echo "ENV=uat" >> $GITHUB_ENV
-            else
-              echo "ENV=dev" >> $GITHUB_ENV
-            fi
-          fi
+        run: echo "ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
-      # Debug (optional but useful)
-      - name: Debug Info
-        run: |
-          echo "Selected ENV=$ENV"
-          echo "Listing repo structure:"
-          ls -R
+      # Debug
+      - name: Show Environment
+        run: echo "Deploying to $ENV"
 
       # Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # Terraform Init
+      # Init
       - name: Terraform Init
         working-directory: ./env/${{ env.ENV }}
         run: terraform init
 
-      # Terraform Workspace
-      - name: Terraform Workspace
-        working-directory: ./env/${{ env.ENV }}
-        run: |
-          terraform workspace select $ENV || terraform workspace new $ENV
-
-      # Terraform Validate
+      # Validate
       - name: Terraform Validate
         working-directory: ./env/${{ env.ENV }}
         run: terraform validate
 
-      # Terraform Plan
+      # Plan
       - name: Terraform Plan
         working-directory: ./env/${{ env.ENV }}
-        run: terraform plan  -out=tfplan
+        run: terraform plan -out=tfplan
 
-      # Terraform Apply (only auto for dev & uat)
+      # Apply
       - name: Terraform Apply
-        if: env.ENV != 'prod'
         working-directory: ./env/${{ env.ENV }}
         run: terraform apply -auto-approve tfplan
-
-      # Manual safeguard for PROD
-      - name: Terraform Apply for PROD
-        if: env.ENV == 'prod'
-        working-directory: ./env/${{ env.ENV }}
-        run: |
-          echo "⚠️ Manual approval recommended for PROD"
-          terraform apply -auto-approve tfplan
