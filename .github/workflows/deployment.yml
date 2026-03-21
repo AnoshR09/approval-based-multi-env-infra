@@ -1,10 +1,54 @@
-name: Test Workflow
+name: Terraform Multi-Environment Deployment
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select environment (dev, uat, prod)'
+        required: true
+        #default: 'dev'
+        type: choice
+        options:
+          - dev
+          - uat
+          - prod
+
 
 jobs:
-  test:
+  terraform:
+    name: Deploy Terraform
     runs-on: ubuntu-latest
+
+    env:
+      TF_WORKING_DIR: ./terraform
+      ENV: ${{ github.event.inputs.environment }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+
     steps:
-      - run: echo "Hello"
+      - name: Checkout code
+       uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Select Workspace
+        run: |
+          terraform workspace select $ENV || terraform workspace new $ENV
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -var="environment=$ENV" -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve tfplan
+    
