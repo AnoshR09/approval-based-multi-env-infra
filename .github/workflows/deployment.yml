@@ -1,53 +1,62 @@
-name: Terraform Multi-Environment Deployment
+name: Terraform Deployment
 
 on:
+  push:
+    branches:
+      - main
+      - dev
+      - uat
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Select environment (dev, uat, prod)'
+        description: 'Select environment'
         required: true
-        #default: 'dev'
         type: choice
         options:
           - dev
           - uat
           - prod
 
-
 jobs:
   terraform:
-    name: Deploy Terraform
     runs-on: ubuntu-latest
 
     env:
       TF_WORKING_DIR: ./terraform
-      ENV: ${{ github.event.inputs.environment }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-    # steps:
-    #   - name: Checkout code
-    #    uses: actions/checkout@v3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    #   - name: Setup Terraform
-    #     uses: hashicorp/setup-terraform@v3
+      - name: Set Environment
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+              echo "ENV=prod" >> $GITHUB_ENV
+            elif [[ "${GITHUB_REF##*/}" == "uat" ]]; then
+              echo "ENV=uat" >> $GITHUB_ENV
+            else
+              echo "ENV=dev" >> $GITHUB_ENV
+            fi
+          fi
 
-    #   - name: Terraform Init
-    #     run: terraform init
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-    #   - name: Select Workspace
-    #     run: |
-    #       terraform workspace select $ENV || terraform workspace new $ENV
+      - name: Terraform Init
+        run: terraform init
 
-    #   - name: Terraform Validate
-    #     run: terraform validate
+      - name: Workspace
+        run: terraform workspace select $ENV || terraform workspace new $ENV
 
-    #   - name: Terraform Plan
-    #     run: terraform plan -var="environment=$ENV" -out=tfplan
+      - name: Plan
+        run: terraform plan -var="environment=$ENV"
 
-    #   - name: Terraform Apply
-    #     if: github.ref == 'refs/heads/main'
-    #     run: terraform apply -auto-approve tfplan
-    
+      - name: Apply
+        run: terraform apply -auto-approve
