@@ -51,4 +51,84 @@ jobs:
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan
-    
+    name: Terraform Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy"
+        required: true
+        type: choice
+        options:
+          - dev
+          - uat
+          - prod
+
+jobs:
+  terraform:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # ✅ AWS Credentials (REQUIRED)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Show selected environment
+        run: echo "Deploying to ${{ github.event.inputs.environment }}"
+
+      # ---------------- INIT ----------------
+      - name: Terraform Init
+        run: terraform init
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- VALIDATE ----------------
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # # ---------------- PLAN ----------------
+      # - name: Terraform Plan
+      #   run: terraform plan -out=tfplan
+      #   working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- PLAN ----------------
+      - name: Terraform Plan
+        run: terraform plan -var="environment=${{ github.event.inputs.environment }}" -out=tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # 👉 Show plan output clearly
+      - name: Show Plan Output
+        run: terraform show tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # # ---------------- APPLY (DEV/UAT) ----------------
+      # - name: Terraform Apply (dev/uat)
+      #   if: github.event.inputs.environment != 'prod'
+      #   run: terraform apply -auto-approve tfplan
+      #   working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- APPLY (PROD - manual approval) ----------------
+      - name: Terraform Apply (dev)
+        if: github.event.inputs.environment == 'dev'
+        run: terraform apply tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- APPLY (PROD - manual approval) ----------------
+      - name: Terraform Apply (prod)
+        if: github.event.inputs.environment == 'prod'
+        run: terraform apply tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
