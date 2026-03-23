@@ -1,53 +1,81 @@
-name: Terraform Multi-Environment Deployment
+name: Terraform Deployment
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Select environment (dev, uat, prod)'
+        description: "Select environment to deploy"
         required: true
-        #default: 'dev'
         type: choice
         options:
           - dev
           - uat
           - prod
 
-
 jobs:
   terraform:
-    name: Deploy Terraform
+    name: Deploy to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
 
-    env:
-      TF_WORKING_DIR: ./terraform
-      ENV: ${{ github.event.inputs.environment }}
+    environment: ${{ github.event.inputs.environment }}
 
-    defaults:
-      run:
-        working-directory: ${{ env.TF_WORKING_DIR }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # steps:
-    #   - name: Checkout code
-    #    uses: actions/checkout@v3
+      # ✅ AWS Credentials (REQUIRED)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
-    #   - name: Setup Terraform
-    #     uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-    #   - name: Terraform Init
-    #     run: terraform init
+      - name: Show selected environment
+        run: echo "Deploying to ${{ github.event.inputs.environment }}"
 
-    #   - name: Select Workspace
-    #     run: |
-    #       terraform workspace select $ENV || terraform workspace new $ENV
+      # ---------------- INIT ----------------
+      - name: Terraform Init
+        run: terraform init
+        working-directory: terraform/${{ github.event.inputs.environment }}
 
-    #   - name: Terraform Validate
-    #     run: terraform validate
+      # ---------------- VALIDATE ----------------
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: terraform/${{ github.event.inputs.environment }}
 
-    #   - name: Terraform Plan
-    #     run: terraform plan -var="environment=$ENV" -out=tfplan
+      # # ---------------- PLAN ----------------
+      # - name: Terraform Plan
+      #   run: terraform plan -out=tfplan
+      #   working-directory: terraform/${{ github.event.inputs.environment }}
 
-    #   - name: Terraform Apply
-    #     if: github.ref == 'refs/heads/main'
-    #     run: terraform apply -auto-approve tfplan
-    
+      # ---------------- PLAN ----------------
+      - name: Terraform Plan
+        run: terraform plan -var="environment=${{ github.event.inputs.environment }}" -out=tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # 👉 Show plan output clearly
+      - name: Show Plan Output
+        run: terraform show tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # # ---------------- APPLY (DEV/UAT) ----------------
+      # - name: Terraform Apply (dev/uat)
+      #   if: github.event.inputs.environment != 'prod'
+      #   run: terraform apply -auto-approve tfplan
+      #   working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- APPLY (PROD - manual approval) ----------------
+      - name: Terraform Apply (dev)
+        if: github.event.inputs.environment == 'dev'
+        run: terraform apply tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}
+
+      # ---------------- APPLY (PROD - manual approval) ----------------
+      - name: Terraform Apply (prod)
+        if: github.event.inputs.environment == 'prod'
+        run: terraform apply tfplan
+        working-directory: terraform/${{ github.event.inputs.environment }}

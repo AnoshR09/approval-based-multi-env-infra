@@ -2,8 +2,8 @@
 *.tfstate
 *.tfstate.backup
 
-# Terraform variable files (may contain sensitive values)
-*.tfvars
+# Terraform variable files (uncomment if tfvars contain sensitive values)
+# *.tfvars
 
 # Terraform working directories
 **/.terraform/

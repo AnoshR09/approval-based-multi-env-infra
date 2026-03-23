@@ -21,4 +21,3 @@ module "ec2" {
     name = "dev-ec2-instance"
     environment = "dev"
 }
-mod
