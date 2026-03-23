@@ -78,4 +78,4 @@ jobs:
       - name: Terraform Apply (prod)
         if: github.event.inputs.environment == 'prod'
         run: terraform apply tfplan
-        working-directory: terraform/${{ github.event.inputs.environment }}
+        working-directory: terraform/${{ github.event.inputs.environment }} 
