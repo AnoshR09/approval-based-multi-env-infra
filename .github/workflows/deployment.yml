@@ -11,6 +11,9 @@ on:
           - dev
           - uat
           - prod
+  push:
+    branches:
+      - main
 
 jobs:
   terraform:
@@ -19,7 +22,7 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
 
     env:
-      TF_WORKING_DIR: ./env/${{ github.event.inputs.environment }}
+      TF_WORKING_DIR: ./env/${{ github.event.inputs.environment || 'dev' }}
 
     steps:
       - name: Checkout code
@@ -47,6 +50,6 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform plan -out=tfplan
 
-      - name: Terraform Apply
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform apply -auto-approve tfplan 
+      # - name: Terraform Apply
+      #   working-directory: ${{ env.TF_WORKING_DIR }}
+      #   run: terraform apply -auto-approve tfplan 
